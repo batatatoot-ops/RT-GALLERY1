@@ -48,12 +48,37 @@
             padding: 8px 20px; border-radius: 50px; cursor: pointer; white-space: nowrap; transition: 0.3s;
         }
         .filter-btn.active, .filter-btn:hover { background: var(--primary); color: white; border-color: var(--primary); }
+        
+        .category-selector {
+            grid-column: 1 / -1;
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            max-height: 150px;
+            overflow-y: auto;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .cat-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(255,255,255,0.05);
+            padding: 5px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        .cat-item input { width: auto; margin: 0; cursor: pointer; }
+
         .upload-section {
             background: rgba(10, 10, 10, 0.6); backdrop-filter: blur(10px); padding: 30px;
             border-radius: 24px; margin-bottom: 50px; border: 1px solid rgba(168, 85, 247, 0.2);
             display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;
         }
-        .upload-section input, .upload-section select {
+        .upload-section input {
             padding: 14px; border-radius: 12px; border: 1px solid #333; background: rgba(0,0,0,0.5); color: #fff; font-family: 'Cairo';
         }
         .upload-section button {
@@ -72,6 +97,9 @@
             background: linear-gradient(to top, rgba(0,0,0,1) 40%, transparent); box-sizing: border-box;
             pointer-events: none;
         }
+        .category-tags-container { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+        .category-tag { background: var(--primary); font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; }
+        
         .del-btn {
             position: absolute; top: 15px; left: 15px;
             background: rgba(239, 68, 68, 0.2);
@@ -81,16 +109,12 @@
             cursor: pointer; z-index: 10; backdrop-filter: blur(5px);
             transition: 0.3s; font-weight: bold;
         }
-        .del-btn:hover { background: var(--danger); transform: scale(1.1); }
-        .category-tag { background: var(--primary); font-size: 0.75rem; padding: 2px 12px; border-radius: 6px; margin-bottom: 8px; display: inline-block; }
-        .artist-name { font-weight: 700; font-size: 1.1rem; display: block; }
         .modal {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.95); justify-content: center; align-items: center; z-index: 2000;
         }
         .modal.active { display: flex; }
         .modal img { max-width: 90%; max-height: 90vh; border-radius: 10px; }
-        #msg { grid-column: 1 / -1; text-align: center; color: var(--primary); font-weight: bold; }
     </style>
 </head>
 <body>
@@ -106,17 +130,22 @@
         <input type="password" id="inp-pass" placeholder="كود الرفع">
         <input type="text" id="inp-name" placeholder="اسم الرسام">
         <input type="text" id="inp-discord" placeholder="ID ديسكورد">
-        <select id="inp-category"></select>
         <input type="text" id="inp-desc" placeholder="وصف العمل">
         <input type="file" id="inp-file" accept="image/*">
+        
+        <p style="grid-column: 1/-1; margin: 0; font-size: 0.9rem; color: #aaa;">اختر الفئات:</p>
+        <div class="category-selector" id="multi-category"></div>
+        
         <button onclick="uploadWork()">نشر العمل</button>
         <div id="msg"></div>
     </div>
     <main class="gallery-grid" id="gallery-container"></main>
 </div>
+
 <div id="artModal" class="modal" onclick="this.classList.remove('active')">
     <img id="fullImage">
 </div>
+
 <script>
     const _u = "https://tkaijxzmanyqvyhbqpok.supabase.co";
     const _k = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrYWlqeHptYW55cXZ5aGJxcG9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MDE0NTMsImV4cCI6MjA4NTM3NzQ1M30.fiveTs63A7x5NOaw3dRYiejUqm_sJjQ5rGwmVKA09CU";
@@ -134,16 +163,19 @@
 
     function initCategories() {
         const filterBar = document.getElementById('filter-bar');
-        const select = document.getElementById('inp-category');
+        const multiCatDiv = document.getElementById('multi-category');
+        
         categories.forEach(cat => {
             const btn = document.createElement('button');
             btn.className = 'filter-btn';
             btn.innerText = cat;
             btn.onclick = () => filterGallery(cat, btn);
             filterBar.appendChild(btn);
-            const opt = document.createElement('option');
-            opt.value = cat; opt.innerText = cat;
-            select.appendChild(opt);
+
+            const label = document.createElement('label');
+            label.className = 'cat-item';
+            label.innerHTML = `<input type="checkbox" value="${cat}"> ${cat}`;
+            multiCatDiv.appendChild(label);
         });
     }
 
@@ -158,17 +190,52 @@
 
     function renderGallery(items) {
         const container = document.getElementById('gallery-container');
-        container.innerHTML = items.map(item => `
+        container.innerHTML = items.map(item => {
+            const tags = item.category ? item.category.split(', ').map(t => `<span class="category-tag">${t}</span>`).join('') : '';
+            return `
             <div class="art-card">
                 <div class="del-btn" onclick="deleteWork('${item.id}')">✕</div>
                 <img src="${item.image_url}" onclick="showImg('${item.image_url}')" loading="lazy">
                 <div class="art-content">
-                    <span class="category-tag">${item.category || 'عام'}</span>
+                    <div class="category-tags-container">${tags}</div>
                     <span class="artist-name">${item.artist_name}</span>
                     <small style="color:var(--primary)">${item.discord_id || ''}</small>
                 </div>
             </div>
-        `).join('');
+        `}).join('');
+    }
+
+    async function uploadWork() {
+        const p = document.getElementById('inp-pass').value;
+        const f = document.getElementById('inp-file').files[0];
+        const n = document.getElementById('inp-name').value;
+        const d = document.getElementById('inp-discord').value;
+        const ds = document.getElementById('inp-desc').value;
+        const m = document.getElementById('msg');
+        const selectedCats = Array.from(document.querySelectorAll('#multi-category input:checked')).map(cb => cb.value).join(', ');
+
+        if (p !== AUTH_KEY) { alert("الكود خطأ"); return; }
+        if (!f || !n || !selectedCats) { alert("أكمل البيانات"); return; }
+        
+        m.innerText = "جاري الرفع...";
+        const fn = Date.now() + '.png';
+        const { error: ue } = await client.storage.from('artist of respect').upload(fn, f);
+        if (ue) { alert(ue.message); m.innerText = ""; return; }
+        
+        const { data: { publicUrl: url } } = client.storage.from('artist of respect').getPublicUrl(fn);
+        const { error: de } = await client.from('gallery').insert([{ 
+            artist_name: n, image_url: url, description: ds, discord_id: d, category: selectedCats 
+        }]);
+
+        if (de) alert(de.message);
+        else location.reload();
+    }
+
+    function filterGallery(category, btn) {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        if(btn) btn.classList.add('active');
+        if (category === 'الكل') renderGallery(allData);
+        else renderGallery(allData.filter(item => item.category && item.category.includes(category)));
     }
 
     async function deleteWork(id) {
@@ -178,39 +245,6 @@
             if (error) alert(error.message);
             else { alert("تم الحذف"); loadContent(); }
         }
-    }
-
-    function filterGallery(category, btn) {
-        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-        if(btn) btn.classList.add('active');
-        if (category === 'الكل') renderGallery(allData);
-        else renderGallery(allData.filter(item => item.category === category));
-    }
-
-    async function uploadWork() {
-        const p = document.getElementById('inp-pass').value;
-        const f = document.getElementById('inp-file').files[0];
-        const n = document.getElementById('inp-name').value;
-        const cat = document.getElementById('inp-category').value;
-        const d = document.getElementById('inp-discord').value;
-        const ds = document.getElementById('inp-desc').value;
-        const m = document.getElementById('msg');
-
-        if (p !== AUTH_KEY) { alert("الكود خطأ"); return; }
-        if (!f || !n) { alert("أكمل البيانات"); return; }
-        
-        m.innerText = "جاري الرفع...";
-        const fn = Date.now() + '.png';
-        const { error: ue } = await client.storage.from('artist of respect').upload(fn, f);
-        if (ue) { alert(ue.message); m.innerText = ""; return; }
-        
-        const { data: { publicUrl: url } } = client.storage.from('artist of respect').getPublicUrl(fn);
-        const { error: de } = await client.from('gallery').insert([{ 
-            artist_name: n, image_url: url, description: ds, discord_id: d, category: cat 
-        }]);
-
-        if (de) alert(de.message);
-        else location.reload();
     }
 
     function showImg(src) {
