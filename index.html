@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RESPECT GALLERY</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary: #a855f7;
+            --primary-hover: #9333ea;
+            --danger: #ef4444;
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: radial-gradient(circle at center, #1e003d, #050505);
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1300px; margin: auto; }
+        header {
+            text-align: center;
+            padding: 50px 20px;
+            margin-bottom: 30px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(15px);
+            border-radius: 30px;
+            border: 1px solid var(--glass-border);
+        }
+        header h1 {
+            font-size: 3.5rem;
+            margin: 0;
+            background: linear-gradient(to bottom, #fff, var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .filter-container {
+            display: flex; gap: 10px; overflow-x: auto; padding: 15px 0; margin-bottom: 30px; scrollbar-width: none;
+        }
+        .filter-container::-webkit-scrollbar { display: none; }
+        .filter-btn {
+            background: var(--glass-bg); border: 1px solid var(--glass-border); color: #ccc;
+            padding: 8px 20px; border-radius: 50px; cursor: pointer; white-space: nowrap; transition: 0.3s;
+        }
+        .filter-btn.active, .filter-btn:hover { background: var(--primary); color: white; border-color: var(--primary); }
+        .upload-section {
+            background: rgba(10, 10, 10, 0.6); backdrop-filter: blur(10px); padding: 30px;
+            border-radius: 24px; margin-bottom: 50px; border: 1px solid rgba(168, 85, 247, 0.2);
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;
+        }
+        .upload-section input, .upload-section select {
+            padding: 14px; border-radius: 12px; border: 1px solid #333; background: rgba(0,0,0,0.5); color: #fff; font-family: 'Cairo';
+        }
+        .upload-section button {
+            grid-column: 1 / -1; padding: 15px; border-radius: 12px; border: none;
+            background: var(--primary); color: white; cursor: pointer; font-weight: bold;
+        }
+        .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 30px; }
+        .art-card {
+            position: relative; border-radius: 25px; overflow: hidden; background: #0a0a0a;
+            border: 1px solid var(--glass-border); transition: 0.4s;
+        }
+        .art-card:hover { transform: translateY(-10px); border-color: var(--primary); }
+        .art-card img { width: 100%; height: 450px; object-fit: cover; display: block; cursor: pointer; }
+        .art-content {
+            position: absolute; bottom: 0; width: 100%; padding: 20px;
+            background: linear-gradient(to top, rgba(0,0,0,1) 40%, transparent); box-sizing: border-box;
+            pointer-events: none;
+        }
+        .del-btn {
+            position: absolute; top: 15px; left: 15px;
+            background: rgba(239, 68, 68, 0.2);
+            color: white; border: 1px solid rgba(239, 68, 68, 0.4);
+            width: 35px; height: 35px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; z-index: 10; backdrop-filter: blur(5px);
+            transition: 0.3s; font-weight: bold;
+        }
+        .del-btn:hover { background: var(--danger); transform: scale(1.1); }
+        .category-tag { background: var(--primary); font-size: 0.75rem; padding: 2px 12px; border-radius: 6px; margin-bottom: 8px; display: inline-block; }
+        .artist-name { font-weight: 700; font-size: 1.1rem; display: block; }
+        .modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.95); justify-content: center; align-items: center; z-index: 2000;
+        }
+        .modal.active { display: flex; }
+        .modal img { max-width: 90%; max-height: 90vh; border-radius: 10px; }
+        #msg { grid-column: 1 / -1; text-align: center; color: var(--primary); font-weight: bold; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>RESPECT GALLERY</h1>
+        <p>معرض رسامين ريسبكت</p>
+    </header>
+    <div class="filter-container" id="filter-bar">
+        <button class="filter-btn active" onclick="filterGallery('الكل')">الكل</button>
+    </div>
+    <div class="upload-section">
+        <input type="password" id="inp-pass" placeholder="كود الرفع">
+        <input type="text" id="inp-name" placeholder="اسم الرسام">
+        <input type="text" id="inp-discord" placeholder="ID ديسكورد">
+        <select id="inp-category"></select>
+        <input type="text" id="inp-desc" placeholder="وصف العمل">
+        <input type="file" id="inp-file" accept="image/*">
+        <button onclick="uploadWork()">نشر العمل</button>
+        <div id="msg"></div>
+    </div>
+    <main class="gallery-grid" id="gallery-container"></main>
+</div>
+<div id="artModal" class="modal" onclick="this.classList.remove('active')">
+    <img id="fullImage">
+</div>
+<script>
+    const _u = "https://tkaijxzmanyqvyhbqpok.supabase.co";
+    const _k = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrYWlqeHptYW55cXZ5aGJxcG9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MDE0NTMsImV4cCI6MjA4NTM3NzQ1M30.fiveTs63A7x5NOaw3dRYiejUqm_sJjQ5rGwmVKA09CU";
+    const client = supabase.createClient(_u, _k);
+    const AUTH_KEY = "RESPECT2025"; 
+    const DELETE_KEY = "DELETE2025"; 
+
+    const categories = [
+        "رسمات S5B", "رسمات F1AISAL", "رسمات الغرب", "رسمات الشرطة", 
+        "رسمات beta", "رسمات c4c", "رسمات eeid", "رسمات SLF", 
+        "رسمات imonkey_d", "رسمات عيال عبيد", "رسمات okb", "رسمات hook", 
+        "رسمات Rayn", "رسمات id7o", "رسمات البلس", "رسمات الياكوزا", 
+        "رسمات البرازلين نيوا", "رسمات لباقي العصابات", "رسمات كتاب ريسبكت"
+    ];
+
+    function initCategories() {
+        const filterBar = document.getElementById('filter-bar');
+        const select = document.getElementById('inp-category');
+        categories.forEach(cat => {
+            const btn = document.createElement('button');
+            btn.className = 'filter-btn';
+            btn.innerText = cat;
+            btn.onclick = () => filterGallery(cat, btn);
+            filterBar.appendChild(btn);
+            const opt = document.createElement('option');
+            opt.value = cat; opt.innerText = cat;
+            select.appendChild(opt);
+        });
+    }
+
+    let allData = [];
+
+    async function loadContent() {
+        const { data, error } = await client.from('gallery').select('*').order('created_at', { ascending: false });
+        if (error) return;
+        allData = data;
+        renderGallery(allData);
+    }
+
+    function renderGallery(items) {
+        const container = document.getElementById('gallery-container');
+        container.innerHTML = items.map(item => `
+            <div class="art-card">
+                <div class="del-btn" onclick="deleteWork('${item.id}')">✕</div>
+                <img src="${item.image_url}" onclick="showImg('${item.image_url}')" loading="lazy">
+                <div class="art-content">
+                    <span class="category-tag">${item.category || 'عام'}</span>
+                    <span class="artist-name">${item.artist_name}</span>
+                    <small style="color:var(--primary)">${item.discord_id || ''}</small>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async function deleteWork(id) {
+        const pass = prompt("كود الحذف:");
+        if (pass === DELETE_KEY) {
+            const { error } = await client.from('gallery').delete().eq('id', id);
+            if (error) alert(error.message);
+            else { alert("تم الحذف"); loadContent(); }
+        }
+    }
+
+    function filterGallery(category, btn) {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        if(btn) btn.classList.add('active');
+        if (category === 'الكل') renderGallery(allData);
+        else renderGallery(allData.filter(item => item.category === category));
+    }
+
+    async function uploadWork() {
+        const p = document.getElementById('inp-pass').value;
+        const f = document.getElementById('inp-file').files[0];
+        const n = document.getElementById('inp-name').value;
+        const cat = document.getElementById('inp-category').value;
+        const d = document.getElementById('inp-discord').value;
+        const ds = document.getElementById('inp-desc').value;
+        const m = document.getElementById('msg');
+
+        if (p !== AUTH_KEY) { alert("الكود خطأ"); return; }
+        if (!f || !n) { alert("أكمل البيانات"); return; }
+        
+        m.innerText = "جاري الرفع...";
+        const fn = Date.now() + '.png';
+        const { error: ue } = await client.storage.from('artist of respect').upload(fn, f);
+        if (ue) { alert(ue.message); m.innerText = ""; return; }
+        
+        const { data: { publicUrl: url } } = client.storage.from('artist of respect').getPublicUrl(fn);
+        const { error: de } = await client.from('gallery').insert([{ 
+            artist_name: n, image_url: url, description: ds, discord_id: d, category: cat 
+        }]);
+
+        if (de) alert(de.message);
+        else location.reload();
+    }
+
+    function showImg(src) {
+        document.getElementById("fullImage").src = src;
+        document.getElementById("artModal").classList.add("active");
+    }
+
+    initCategories();
+    loadContent();
+</script>
+</body>
+</html>
