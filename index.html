@@ -259,8 +259,19 @@
         document.getElementById("fullImage").src = src;
         document.getElementById("artModal").classList.add("active");
         document.getElementById("likeCount").innerText = likes;
-        document.getElementById("viewCount").innerText = views;
-        await client.from('gallery').update({ views: views + 1 }).eq('id', id);
+        
+        const viewKey = `viewed_${id}`;
+        const hasViewed = localStorage.getItem(viewKey);
+        
+        if (!hasViewed) {
+            const newViews = views + 1;
+            document.getElementById("viewCount").innerText = newViews;
+            await client.from('gallery').update({ views: newViews }).eq('id', id);
+            localStorage.setItem(viewKey, 'true');
+        } else {
+            document.getElementById("viewCount").innerText = views;
+        }
+
         const btn = document.getElementById("likeBtn");
         btn.classList.remove("liked");
         if(currentUser) {
