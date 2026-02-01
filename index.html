@@ -98,6 +98,7 @@
 <div id="authModal" class="auth-modal">
     <div class="auth-box">
         <h2 id="authTitle" style="margin-top:0; color:white">تسجيل الدخول</h2>
+        <input type="text" id="authUsername" placeholder="اسم المستخدم (سيظهر للجميع)" style="display:none">
         <input type="email" id="authEmail" placeholder="البريد الإلكتروني">
         <input type="password" id="authPass" placeholder="كلمة المرور">
         <button onclick="submitAuth()">تأكيد</button>
@@ -165,8 +166,8 @@
         currentUser = user;
         const header = document.getElementById('authHeader');
         if(user) {
-            const name = user.email.split('@')[0];
-            header.innerHTML = `<span style="color:#aaa; align-self:center; font-size:0.9rem">مرحباً ${name}</span>
+            const displayName = user.user_metadata?.username || user.email.split('@')[0];
+            header.innerHTML = `<span style="color:#a855f7; align-self:center; font-size:0.9rem; font-weight:bold">مرحباً ${displayName}</span>
                                 <button class="auth-btn" onclick="logout()">خروج</button>`;
         }
     }
@@ -174,16 +175,23 @@
     function openAuth(mode) {
         authMode = mode;
         document.getElementById('authTitle').innerText = mode === 'login' ? 'تسجيل دخول' : 'حساب جديد';
+        document.getElementById('authUsername').style.display = mode === 'signup' ? 'block' : 'none';
         document.getElementById('authModal').style.display = 'flex';
     }
 
     async function submitAuth() {
         const email = document.getElementById('authEmail').value;
         const pass = document.getElementById('authPass').value;
+        const username = document.getElementById('authUsername').value;
         if(!email || !pass) return alert("أدخل البيانات");
+        if(authMode === 'signup' && !username) return alert("يرجى كتابة اسم مستخدم");
         let error;
         if(authMode === 'signup') {
-            const res = await client.auth.signUp({ email, password: pass });
+            const res = await client.auth.signUp({ 
+                email, 
+                password: pass,
+                options: { data: { username: username } }
+            });
             error = res.error;
             if(!error) alert("تم إنشاء الحساب! سجل دخولك الآن");
         } else {
@@ -212,8 +220,7 @@
                 <div class="art-content">
                     <div class="category-tags-container">${tags}</div>
                     <div class="artist-info">
-                        <div><span class="artist-name">${item.artist_name}</span><br>
-                        <small style="color:var(--primary)">${item.discord_id || ''}</small></div>
+                        <div><span class="artist-name">${item.artist_name}</span></div>
                         ${twitter}
                     </div>
                 </div>
@@ -259,19 +266,16 @@
         document.getElementById("fullImage").src = src;
         document.getElementById("artModal").classList.add("active");
         document.getElementById("likeCount").innerText = likes;
-        
         const viewKey = `viewed_${id}`;
         const hasViewed = localStorage.getItem(viewKey);
-        
         if (!hasViewed) {
-            const newViews = views + 1;
+            const newViews = (views || 0) + 1;
             document.getElementById("viewCount").innerText = newViews;
             await client.from('gallery').update({ views: newViews }).eq('id', id);
             localStorage.setItem(viewKey, 'true');
         } else {
-            document.getElementById("viewCount").innerText = views;
+            document.getElementById("viewCount").innerText = views || 0;
         }
-
         const btn = document.getElementById("likeBtn");
         btn.classList.remove("liked");
         if(currentUser) {
@@ -306,7 +310,8 @@
         if(!currentUser) return openAuth('login');
         const text = document.getElementById('c-text').value;
         if (!text) return;
-        const { error } = await client.from('comments').insert([{ art_id: activeArtId, name: currentUser.email.split('@')[0], content: text }]);
+        const senderName = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+        const { error } = await client.from('comments').insert([{ art_id: activeArtId, name: senderName, content: text }]);
         if (!error) { document.getElementById('c-text').value = ""; loadComments(activeArtId); }
     }
 
