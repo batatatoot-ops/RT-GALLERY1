@@ -13,6 +13,7 @@
             --danger: #ef4444;
             --glass-bg: rgba(255, 255, 255, 0.03);
             --glass-border: rgba(255, 255, 255, 0.1);
+            --twitter-blue: #1DA1F2;
         }
         body {
             font-family: 'Cairo', sans-serif;
@@ -97,6 +98,8 @@
         }
         .category-tags-container { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
         .category-tag { background: var(--primary); font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; }
+        .artist-info { display: flex; align-items: center; justify-content: space-between; pointer-events: auto; }
+        .twitter-link { color: var(--twitter-blue); text-decoration: none; font-size: 0.8rem; display: flex; align-items: center; gap: 4px; }
         .del-btn {
             position: absolute; top: 15px; left: 15px;
             background: rgba(239, 68, 68, 0.2);
@@ -116,7 +119,7 @@
             background: #0a0a0a; width: 90%; max-width: 800px; border-radius: 20px; 
             border: 1px solid var(--glass-border); overflow: hidden; position: relative;
         }
-        .modal img { width: 100%; max-height: 70vh; object-fit: contain; background: #000; }
+        .modal img { width: 100%; max-height: 70vh; object-fit: contain; background: #000; cursor: zoom-in; }
         .comment-area { padding: 20px; background: #0f0f0f; }
         .comment-list { max-height: 250px; overflow-y: auto; margin-bottom: 15px; }
         .comment-item { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-right: 3px solid var(--primary); }
@@ -141,6 +144,7 @@
         <input type="password" id="inp-pass" placeholder="كود الرفع">
         <input type="text" id="inp-name" placeholder="اسم الرسام">
         <input type="text" id="inp-discord" placeholder="ID ديسكورد">
+        <input type="text" id="inp-twitter" placeholder="رابط تويتر (اختياري)">
         <input type="text" id="inp-desc" placeholder="وصف العمل">
         <input type="file" id="inp-file" accept="image/*">
         <p style="grid-column: 1/-1; margin: 0; font-size: 0.9rem; color: #aaa;">اختر الفئات:</p>
@@ -154,8 +158,9 @@
 <div id="artModal" class="modal">
     <span class="close-x" onclick="document.getElementById('artModal').classList.remove('active')">✕</span>
     <div class="modal-content">
-        <img id="fullImage">
+        <img id="fullImage" onclick="openOriginalImage(this.src)">
         <div class="comment-area">
+            <p style="font-size: 0.8rem; color: #888; margin-top: 0;">* اضغط على الصورة لفتحها بحجمها الكامل</p>
             <h4>التعليقات</h4>
             <div id="comments-container" class="comment-list"></div>
             <div class="comment-inputs">
@@ -212,14 +217,20 @@
         const container = document.getElementById('gallery-container');
         container.innerHTML = items.map(item => {
             const tags = item.category ? item.category.split(', ').map(t => `<span class="category-tag">${t}</span>`).join('') : '';
+            const twitter = item.twitter_url ? `<a href="${item.twitter_url}" target="_blank" class="twitter-link">Twitter 𝕏</a>` : '';
             return `
             <div class="art-card">
                 <div class="del-btn" onclick="deleteWork('${item.id}')">✕</div>
                 <img src="${item.image_url}" onclick="showImg('${item.image_url}', '${item.id}')" loading="lazy">
                 <div class="art-content">
                     <div class="category-tags-container">${tags}</div>
-                    <span class="artist-name">${item.artist_name}</span>
-                    <small style="color:var(--primary)">${item.discord_id || ''}</small>
+                    <div class="artist-info">
+                        <div>
+                           <span class="artist-name">${item.artist_name}</span><br>
+                           <small style="color:var(--primary)">${item.discord_id || ''}</small>
+                        </div>
+                        ${twitter}
+                    </div>
                 </div>
             </div>`;
         }).join('');
@@ -230,17 +241,29 @@
         const f = document.getElementById('inp-file').files[0];
         const n = document.getElementById('inp-name').value;
         const d = document.getElementById('inp-discord').value;
+        const t = document.getElementById('inp-twitter').value;
         const ds = document.getElementById('inp-desc').value;
         const m = document.getElementById('msg');
         const selectedCats = Array.from(document.querySelectorAll('#multi-category input:checked')).map(cb => cb.value).join(', ');
+        
         if (p !== AUTH_KEY) { alert("الكود خطأ"); return; }
         if (!f || !n || !selectedCats) { alert("أكمل البيانات"); return; }
+        
         m.innerText = "جاري الرفع...";
         const fn = Date.now() + '.png';
         const { error: ue } = await client.storage.from('artist of respect').upload(fn, f);
         if (ue) { alert(ue.message); m.innerText = ""; return; }
+        
         const { data: { publicUrl: url } } = client.storage.from('artist of respect').getPublicUrl(fn);
-        const { error: de } = await client.from('gallery').insert([{ artist_name: n, image_url: url, description: ds, discord_id: d, category: selectedCats }]);
+        const { error: de } = await client.from('gallery').insert([{ 
+            artist_name: n, 
+            image_url: url, 
+            description: ds, 
+            discord_id: d, 
+            twitter_url: t,
+            category: selectedCats 
+        }]);
+        
         if (de) alert(de.message); else location.reload();
     }
 
@@ -258,11 +281,15 @@
         }
     }
 
-    async function showImg(src, id) {
+    function showImg(src, id) {
         activeArtId = id;
         document.getElementById("fullImage").src = src;
         document.getElementById("artModal").classList.add("active");
         loadComments(id);
+    }
+
+    function openOriginalImage(src) {
+        window.open(src, '_blank');
     }
 
     async function loadComments(id) {
@@ -285,5 +312,4 @@
     loadContent();
 </script>
 </body>
-    </html>
-    
+</html>
