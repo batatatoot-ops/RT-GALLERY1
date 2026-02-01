@@ -14,6 +14,7 @@
             --glass-bg: rgba(255, 255, 255, 0.03);
             --glass-border: rgba(255, 255, 255, 0.1);
             --twitter-blue: #1DA1F2;
+            --heart: #ef4444;
         }
         body {
             font-family: 'Cairo', sans-serif;
@@ -93,13 +94,15 @@
         .art-card img { width: 100%; height: 450px; object-fit: cover; display: block; cursor: pointer; }
         .art-content {
             position: absolute; bottom: 0; width: 100%; padding: 20px;
-            background: linear-gradient(to top, rgba(0,0,0,1) 40%, transparent); box-sizing: border-box;
+            background: linear-gradient(to top, rgba(0,0,0,1) 60%, transparent); box-sizing: border-box;
             pointer-events: none;
         }
         .category-tags-container { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
         .category-tag { background: var(--primary); font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; }
         .artist-info { display: flex; align-items: center; justify-content: space-between; pointer-events: auto; }
         .twitter-link { color: var(--twitter-blue); text-decoration: none; font-size: 0.8rem; display: flex; align-items: center; gap: 4px; }
+        .card-stats { display: flex; gap: 10px; font-size: 0.75rem; color: #aaa; margin-top: 5px; }
+        
         .del-btn {
             position: absolute; top: 15px; left: 15px;
             background: rgba(239, 68, 68, 0.2);
@@ -120,11 +123,20 @@
             border: 1px solid var(--glass-border); overflow: hidden; position: relative;
         }
         .modal img { width: 100%; max-height: 70vh; object-fit: contain; background: #000; cursor: zoom-in; }
+        
+        .interaction-bar {
+            padding: 15px 20px; display: flex; justify-content: space-between; align-items: center;
+            background: #0f0f0f; border-bottom: 1px solid #222;
+        }
+        .like-btn {
+            background: rgba(239, 68, 68, 0.1); color: var(--heart); border: 1px solid var(--heart);
+            padding: 8px 18px; border-radius: 50px; cursor: pointer; font-weight: bold; transition: 0.3s;
+        }
+        .like-btn.liked { background: var(--heart); color: white; }
+        
         .comment-area { padding: 20px; background: #0f0f0f; }
         .comment-list { max-height: 250px; overflow-y: auto; margin-bottom: 15px; }
         .comment-item { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-right: 3px solid var(--primary); }
-        .comment-item b { color: var(--primary); display: block; font-size: 0.9rem; }
-        .comment-item p { margin: 5px 0 0; font-size: 0.85rem; }
         .comment-inputs { display: flex; gap: 10px; }
         .comment-inputs input { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #333; background: #1a1a1a; color: #fff; font-family: 'Cairo'; }
         .comment-inputs button { background: var(--primary); border: none; color: white; padding: 0 20px; border-radius: 8px; cursor: pointer; }
@@ -144,7 +156,7 @@
         <input type="password" id="inp-pass" placeholder="كود الرفع">
         <input type="text" id="inp-name" placeholder="اسم الرسام">
         <input type="text" id="inp-discord" placeholder="ID ديسكورد">
-        <input type="text" id="inp-twitter" placeholder="رابط تويتر (اختياري)">
+        <input type="text" id="inp-twitter" placeholder="رابط تويتر">
         <input type="text" id="inp-desc" placeholder="وصف العمل">
         <input type="file" id="inp-file" accept="image/*">
         <p style="grid-column: 1/-1; margin: 0; font-size: 0.9rem; color: #aaa;">اختر الفئات:</p>
@@ -156,11 +168,17 @@
 </div>
 
 <div id="artModal" class="modal">
-    <span class="close-x" onclick="document.getElementById('artModal').classList.remove('active')">✕</span>
+    <span class="close-x" onclick="closeModal()">✕</span>
     <div class="modal-content">
-        <img id="fullImage" onclick="openOriginalImage(this.src)">
+        <img id="fullImage" onclick="window.open(this.src, '_blank')">
+        <div class="interaction-bar">
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <button id="likeBtn" class="like-btn" onclick="handleLike()">❤️ <span id="likeCount">0</span></button>
+                <span id="viewCount" style="color: #888; font-size: 0.9rem;">👁️ 0</span>
+            </div>
+            <a id="modalTwitter" href="#" target="_blank" class="twitter-link" style="font-weight: bold;">Twitter 𝕏</a>
+        </div>
         <div class="comment-area">
-            <p style="font-size: 0.8rem; color: #888; margin-top: 0;">* اضغط على الصورة لفتحها بحجمها الكامل</p>
             <h4>التعليقات</h4>
             <div id="comments-container" class="comment-list"></div>
             <div class="comment-inputs">
@@ -179,38 +197,29 @@
     const AUTH_KEY = "RESPECT2025"; 
     const DELETE_KEY = "DELETE2025"; 
 
-    const categories = [
-        "رسمات S5B", "رسمات F1AISAL", "رسمات الغرب", "رسمات الشرطة", 
-        "رسمات beta", "رسمات c4c", "رسمات eeid", "رسمات SLF", 
-        "رسمات imonkey_d", "رسمات عيال عبيد", "رسمات okb", "رسمات hook", 
-        "رسمات Rayn", "رسمات id7o", "رسمات البلس", "رسمات الياكوزا", 
-        "رسمات البرازلين نيوا", "رسمات لباقي العصابات", "رسمات كتاب ريسبكت"
-    ];
-
+    const categories = ["رسمات S5B", "رسمات F1AISAL", "رسمات الغرب", "رسمات الشرطة", "رسمات beta", "رسمات c4c", "رسمات eeid", "رسمات SLF", "رسمات imonkey_d", "رسمات عيال عبيد", "رسمات okb", "رسمات hook", "رسمات Rayn", "رسمات id7o", "رسمات البلس", "رسمات الياكوزا", "رسمات البرازلين نيوا", "رسمات لباقي العصابات", "رسمات كتاب ريسبكت"];
     let allData = [];
-    let activeArtId = null;
+    let activeArt = null;
 
     function initCategories() {
-        const filterBar = document.getElementById('filter-bar');
-        const multiCatDiv = document.getElementById('multi-category');
+        const bar = document.getElementById('filter-bar');
+        const multi = document.getElementById('multi-category');
         categories.forEach(cat => {
             const btn = document.createElement('button');
             btn.className = 'filter-btn';
             btn.innerText = cat;
             btn.onclick = () => filterGallery(cat, btn);
-            filterBar.appendChild(btn);
-            const label = document.createElement('label');
-            label.className = 'cat-item';
-            label.innerHTML = `<input type="checkbox" value="${cat}"> ${cat}`;
-            multiCatDiv.appendChild(label);
+            bar.appendChild(btn);
+            const lbl = document.createElement('label');
+            lbl.className = 'cat-item';
+            lbl.innerHTML = `<input type="checkbox" value="${cat}"> ${cat}`;
+            multi.appendChild(lbl);
         });
     }
 
     async function loadContent() {
         const { data, error } = await client.from('gallery').select('*').order('created_at', { ascending: false });
-        if (error) return;
-        allData = data;
-        renderGallery(allData);
+        if (!error) { allData = data; renderGallery(allData); }
     }
 
     function renderGallery(items) {
@@ -221,13 +230,14 @@
             return `
             <div class="art-card">
                 <div class="del-btn" onclick="deleteWork('${item.id}')">✕</div>
-                <img src="${item.image_url}" onclick="showImg('${item.image_url}', '${item.id}')" loading="lazy">
+                <img src="${item.image_url}" onclick="showImg('${item.id}')" loading="lazy">
                 <div class="art-content">
                     <div class="category-tags-container">${tags}</div>
                     <div class="artist-info">
                         <div>
                            <span class="artist-name">${item.artist_name}</span><br>
                            <small style="color:var(--primary)">${item.discord_id || ''}</small>
+                           <div class="card-stats">👁️ ${item.views || 0}  ❤️ ${item.likes || 0}</div>
                         </div>
                         ${twitter}
                     </div>
@@ -240,31 +250,70 @@
         const p = document.getElementById('inp-pass').value;
         const f = document.getElementById('inp-file').files[0];
         const n = document.getElementById('inp-name').value;
-        const d = document.getElementById('inp-discord').value;
-        const t = document.getElementById('inp-twitter').value;
-        const ds = document.getElementById('inp-desc').value;
-        const m = document.getElementById('msg');
-        const selectedCats = Array.from(document.querySelectorAll('#multi-category input:checked')).map(cb => cb.value).join(', ');
+        const tw = document.getElementById('inp-twitter').value;
+        const sel = Array.from(document.querySelectorAll('#multi-category input:checked')).map(cb => cb.value).join(', ');
+        if (p !== AUTH_KEY || !f || !n || !sel) return alert("تأكد من البيانات والكود");
         
-        if (p !== AUTH_KEY) { alert("الكود خطأ"); return; }
-        if (!f || !n || !selectedCats) { alert("أكمل البيانات"); return; }
-        
-        m.innerText = "جاري الرفع...";
         const fn = Date.now() + '.png';
-        const { error: ue } = await client.storage.from('artist of respect').upload(fn, f);
-        if (ue) { alert(ue.message); m.innerText = ""; return; }
-        
+        await client.storage.from('artist of respect').upload(fn, f);
         const { data: { publicUrl: url } } = client.storage.from('artist of respect').getPublicUrl(fn);
-        const { error: de } = await client.from('gallery').insert([{ 
-            artist_name: n, 
-            image_url: url, 
-            description: ds, 
-            discord_id: d, 
-            twitter_url: t,
-            category: selectedCats 
+        await client.from('gallery').insert([{ 
+            artist_name: n, image_url: url, twitter_url: tw, category: sel,
+            discord_id: document.getElementById('inp-discord').value,
+            description: document.getElementById('inp-desc').value
         }]);
+        location.reload();
+    }
+
+    async function showImg(id) {
+        activeArt = allData.find(a => a.id == id);
+        document.getElementById("fullImage").src = activeArt.image_url;
+        document.getElementById("likeCount").innerText = activeArt.likes || 0;
+        document.getElementById("viewCount").innerText = `👁️ ${activeArt.views || 0}`;
         
-        if (de) alert(de.message); else location.reload();
+        const twLink = document.getElementById("modalTwitter");
+        if(activeArt.twitter_url) { twLink.href = activeArt.twitter_url; twLink.style.display = 'block'; }
+        else { twLink.style.display = 'none'; }
+
+        document.getElementById("artModal").classList.add("active");
+        
+        const newViews = (activeArt.views || 0) + 1;
+        await client.from('gallery').update({ views: newViews }).eq('id', id);
+        activeArt.views = newViews;
+        loadComments(id);
+    }
+
+    async function handleLike() {
+        const btn = document.getElementById('likeBtn');
+        if(btn.classList.contains('liked')) return;
+        const newLikes = (activeArt.likes || 0) + 1;
+        const { error } = await client.from('gallery').update({ likes: newLikes }).eq('id', activeArt.id);
+        if(!error) {
+            activeArt.likes = newLikes;
+            document.getElementById("likeCount").innerText = newLikes;
+            btn.classList.add('liked');
+        }
+    }
+
+    function closeModal() {
+        document.getElementById("artModal").classList.remove("active");
+        document.getElementById('likeBtn').classList.remove('liked');
+        loadContent();
+    }
+
+    async function loadComments(id) {
+        const { data } = await client.from('comments').select('*').eq('art_id', id).order('created_at', { ascending: false });
+        const cont = document.getElementById('comments-container');
+        cont.innerHTML = data && data.length ? data.map(c => `<div class="comment-item"><b>${c.name}</b><p>${c.content}</p></div>`).join('') : 'لا توجد تعليقات.';
+    }
+
+    async function sendComment() {
+        const n = document.getElementById('c-name').value;
+        const t = document.getElementById('c-text').value;
+        if (!n || !t) return alert("أكمل البيانات");
+        await client.from('comments').insert([{ art_id: activeArt.id, name: n, content: t }]);
+        document.getElementById('c-text').value = "";
+        loadComments(activeArt.id);
     }
 
     function filterGallery(category, btn) {
@@ -274,38 +323,10 @@
     }
 
     async function deleteWork(id) {
-        const pass = prompt("كود الحذف:");
-        if (pass === DELETE_KEY) {
-            const { error } = await client.from('gallery').delete().eq('id', id);
-            if (error) alert(error.message); else { alert("تم الحذف"); loadContent(); }
+        if (prompt("كود الحذف:") === DELETE_KEY) {
+            await client.from('gallery').delete().eq('id', id);
+            loadContent();
         }
-    }
-
-    function showImg(src, id) {
-        activeArtId = id;
-        document.getElementById("fullImage").src = src;
-        document.getElementById("artModal").classList.add("active");
-        loadComments(id);
-    }
-
-    function openOriginalImage(src) {
-        window.open(src, '_blank');
-    }
-
-    async function loadComments(id) {
-        const container = document.getElementById('comments-container');
-        container.innerHTML = "جاري التحميل...";
-        const { data, error } = await client.from('comments').select('*').eq('art_id', id).order('created_at', { ascending: false });
-        if (error || !data.length) { container.innerHTML = "لا توجد تعليقات."; return; }
-        container.innerHTML = data.map(c => `<div class="comment-item"><b>${c.name}</b><p>${c.content}</p></div>`).join('');
-    }
-
-    async function sendComment() {
-        const name = document.getElementById('c-name').value;
-        const text = document.getElementById('c-text').value;
-        if (!name || !text) return alert("أكمل البيانات");
-        const { error } = await client.from('comments').insert([{ art_id: activeArtId, name: name, content: text }]);
-        if (error) alert(error.message); else { document.getElementById('c-text').value = ""; loadComments(activeArtId); }
     }
 
     initCategories();
