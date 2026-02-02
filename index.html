@@ -61,6 +61,7 @@
         .comment-inputs { display: flex; gap: 10px; }
         .comment-inputs input { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #333; background: #1a1a1a; color: #fff; font-family: 'Cairo'; }
         .comment-inputs button { background: var(--primary); border: none; color: white; padding: 0 20px; border-radius: 8px; cursor: pointer; }
+        .description-display { background: rgba(255,255,255,0.03); padding: 15px; border-radius: 12px; border-right: 3px solid var(--primary); margin-top: 10px; color: #ddd; font-size: 0.95rem; line-height: 1.6; }
         .close-x { position: absolute; top: 10px; right: 20px; color: white; font-size: 30px; cursor: pointer; z-index: 2100; }
         .like-section { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
         .like-btn { background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 5px 15px; border-radius: 20px; cursor: pointer; }
@@ -121,6 +122,10 @@
                 <input type="text" id="c-text" placeholder="اكتب تعليقك...">
                 <button onclick="sendComment()">إرسال</button>
             </div>
+            <div id="desc-wrapper" style="margin-top:25px; border-top:1px solid #222; padding-top:15px;">
+                <h4 style="margin-bottom:10px; color:var(--primary)">الوصف</h4>
+                <div id="artDescription" class="description-display"></div>
+            </div>
         </div>
     </div>
 </div>
@@ -137,7 +142,10 @@
         "رسمات imonkey_d", "رسمات عيال عبيد", "رسمات okb", "رسمات hook", 
         "رسمات Rayn", "رسمات id7o", "رسمات البلس", "رسمات الياكوزا", 
         "رسمات البرازلين نيوا", "رسمات drb7h", "رسمات المافيا الروسية", 
-        "رسمات لباقي العصابات", "رسمات كتاب ريسبكت"
+        "رسمات لباقي العصابات", "رسمات كتاب ريسبكت", "رسمات W1ype", 
+        "رسمات Wolf", "رسمات xKndrx", "رسمات NEFOXD", "رسمات Seagull", 
+        "رسمات i2Reap", "رسمات AYMNALSTAM", "رسمات SODRY", 
+        "رسمات odayyoyou", "رسمات ABOKHALED_SA"
     ];
 
     let allData = [];
@@ -187,11 +195,7 @@
         if(authMode === 'signup' && !username) return alert("يرجى كتابة اسم مستخدم");
         let error;
         if(authMode === 'signup') {
-            const res = await client.auth.signUp({ 
-                email, 
-                password: pass,
-                options: { data: { username: username } }
-            });
+            const res = await client.auth.signUp({ email, password: pass, options: { data: { username: username } } });
             error = res.error;
             if(!error) alert("تم إنشاء الحساب! سجل دخولك الآن");
         } else {
@@ -205,7 +209,7 @@
     async function logout() { await client.auth.signOut(); location.reload(); }
 
     async function loadContent() {
-        const { data, error } = await client.from('gallery').select('*').order('created_at', { ascending: false });
+        const { data } = await client.from('gallery').select('*').order('created_at', { ascending: false });
         if (data) { allData = data; renderGallery(allData); }
     }
 
@@ -216,7 +220,7 @@
             const twitter = item.twitter_url ? `<a href="${item.twitter_url}" target="_blank" class="twitter-link">Twitter 𝕏</a>` : '';
             return `<div class="art-card">
                 <div class="del-btn" onclick="deleteWork('${item.id}')">✕</div>
-                <img src="${item.image_url}" onclick="showImg('${item.image_url}', '${item.id}', ${item.views || 0}, ${item.likes || 0})" loading="lazy">
+                <img src="${item.image_url}" onclick="showImg('${item.id}', ${item.views || 0}, ${item.likes || 0})" loading="lazy">
                 <div class="art-content">
                     <div class="category-tags-container">${tags}</div>
                     <div class="artist-info">
@@ -261,14 +265,16 @@
         }
     }
 
-    async function showImg(src, id, views, likes) {
+    async function showImg(id, views, likes) {
         activeArtId = id;
-        document.getElementById("fullImage").src = src;
+        const item = allData.find(i => i.id == id);
+        if(!item) return;
+        document.getElementById("fullImage").src = item.image_url;
         document.getElementById("artModal").classList.add("active");
         document.getElementById("likeCount").innerText = likes;
+        document.getElementById("artDescription").innerText = item.description || "لا يوجد وصف متوفر لهذا العمل.";
         const viewKey = `viewed_${id}`;
-        const hasViewed = localStorage.getItem(viewKey);
-        if (!hasViewed) {
+        if (!localStorage.getItem(viewKey)) {
             const newViews = (views || 0) + 1;
             document.getElementById("viewCount").innerText = newViews;
             await client.from('gallery').update({ views: newViews }).eq('id', id);
